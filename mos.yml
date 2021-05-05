@@ -1,0 +1,16 @@
+author: QRPp <awesome.walrus+github@gmail.com>
+description: Mongoose OS RPC interface for CC1101 RF module lib
+name: rpc-service-cc1101
+type: lib
+version: 1.0
+manifest_version: 2020-08-02
+
+sources: [src]
+
+config_schema:
+  - ["cc1101.rpc_enable", "b", true, {"title": "Register CC1101 RPC methods"}]
+
+libs:
+  - origin: https://github.com/mongoose-os-libs/rpc-common
+  - origin: ../mgos-cc1101
+  - origin: https://github.com/QRPp/mgos-helpers
