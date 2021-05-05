@@ -12,5 +12,5 @@ config_schema:
 
 libs:
   - origin: https://github.com/mongoose-os-libs/rpc-common
-  - origin: ../mgos-cc1101
+  - origin: https://github.com/QRPp/mgos-cc1101
   - origin: https://github.com/QRPp/mgos-helpers
