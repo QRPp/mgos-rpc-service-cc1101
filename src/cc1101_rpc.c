@@ -5,6 +5,20 @@
 
 #include <mgos-cc1101.h>
 
+static struct tx_stats {
+  bool busy;
+  enum mgos_cc1101_tx_err err;
+  struct mgos_cc1101_tx_stats st;
+} txop;
+
+static void txop_save(void *opaque) {
+  struct mgos_cc1101_tx_op *op = opaque;
+  txop.busy = false;
+  txop.err = op->err;
+  txop.st = op->st;
+  free(op);
+}
+
 static void cc1101_identify_handler(struct mg_rpc_request_info *ri,
                                     void *cb_arg, struct mg_rpc_frame_info *fi,
                                     struct mg_str args) {
@@ -166,9 +180,18 @@ static void cc1101_tx_handler(struct mg_rpc_request_info *ri, void *cb_arg,
   if ((bits + 7) / 8 != dataLen)
     mg_rpc_errorf_ret(400, "%u bit%s makes no sense with %d data byte%s", bits,
                       MUL(bits), dataLen, MUL(dataLen));
-  bool ok = mgos_cc1101_tx(mgos_cc1101_get_global_locked(), bits, data, copies);
+  struct mgos_cc1101_tx_req req = {
+    data : data,
+    len : bits,
+    copies : copies,
+    free_data : true,
+    cb : txop_save
+  };
+  txop.busy = true;
+  bool ok = mgos_cc1101_tx(mgos_cc1101_get_global_locked(), &req);
   mgos_cc1101_put_global_locked();
   if (!ok) {
+    txop.busy = false;
     free(data);
     mg_rpc_errorf_ret(500, "error sending %u bits %u time%s", bits, copies + 1,
                       MUL(copies + 1));
@@ -182,15 +205,12 @@ static void cc1101_tx_handler(struct mg_rpc_request_info *ri, void *cb_arg,
 static void cc1101_tx_stats_handler(struct mg_rpc_request_info *ri,
                                     void *cb_arg, struct mg_rpc_frame_info *fi,
                                     struct mg_str args) {
-  const struct mgos_cc1101_tx_stats *st =
-      mgos_cc1101_tx_stats(mgos_cc1101_get_global_locked());
-  mgos_cc1101_put_global_locked();
   mg_rpc_send_responsef(ri,
-                        "{busy:%B,ok:%B,underflow:%B,delay_us:" DISTRIB_FMT
+                        "{busy:%B,err:%d,delay_us:" DISTRIB_FMT
                         ",feed_us:" DISTRIB_FMT ",fifo_byt:" DISTRIB_FMT "}",
-                        st->busy, st->ok, st->underflow,
-                        DISTRIB_ARGS(st->delay_us), DISTRIB_ARGS(st->feed_us),
-                        DISTRIB_ARGS(st->fifo_byt));
+                        txop.busy, txop.err, DISTRIB_ARGS(txop.st.delay_us),
+                        DISTRIB_ARGS(txop.st.feed_us),
+                        DISTRIB_ARGS(txop.st.fifo_byt));
 }
 
 #define WRITE_REG_FMT "{reg:%u,val:%u}"
