@@ -226,6 +226,29 @@ static void cc1101_write_reg_handler(struct mg_rpc_request_info *ri,
   mg_rpc_send_responsef(ri, "{reg:%u,val:%u}", reg, val);
 }
 
+#define WRITE_REGS_FMT "{reg:%u,vals:%H}"
+static void cc1101_write_regs_handler(struct mg_rpc_request_info *ri,
+                                     void *cb_arg, struct mg_rpc_frame_info *fi,
+                                     struct mg_str args) {
+  unsigned reg;
+  uint8_t *vals = NULL;
+  int valsLen = 0;
+  if (json_scanf(args.p, args.len, ri->args_fmt, &reg, &valsLen, &vals) != 2 ||
+      valsLen < 1)
+    mg_rpc_errorf_gt(400, "reg and non-empty vals are required");
+  uint8_t *tx = alloca(valsLen + 1);
+  tx[0] = reg;
+  memcpy(tx + 1, vals, valsLen);
+  bool ok =
+      mgos_cc1101_write_regs(mgos_cc1101_get_global_locked(), valsLen, tx);
+  mgos_cc1101_put_global_locked();
+  if (!ok)
+    mg_rpc_errorf_gt(500, "error writing %d registers from %u", valsLen, reg);
+  mg_rpc_send_responsef(ri, "{reg:%u,vals:%H}", reg, valsLen, vals);
+err:
+  if (vals) free(vals);
+}
+
 bool mgos_rpc_service_cc1101_init() {
   if (!mgos_sys_config_get_cc1101_rpc_enable() || !mgos_cc1101_get_global())
     return true;
@@ -242,5 +265,7 @@ bool mgos_rpc_service_cc1101_init() {
   mg_rpc_add_handler(rpc, "CC1101.TxStats", "", cc1101_tx_stats_handler, NULL);
   mg_rpc_add_handler(rpc, "CC1101.WriteReg", WRITE_REG_FMT,
                      cc1101_write_reg_handler, NULL);
+  mg_rpc_add_handler(rpc, "CC1101.WriteRegs", WRITE_REGS_FMT,
+                     cc1101_write_regs_handler, NULL);
   return true;
 }
