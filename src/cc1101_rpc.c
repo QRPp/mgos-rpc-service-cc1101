@@ -1,5 +1,6 @@
 #include <math.h>
 
+#include <mgos-helpers/json.h>
 #include <mgos-helpers/log.h>
 #include <mgos-helpers/rpc.h>
 
@@ -228,8 +229,9 @@ static void cc1101_write_reg_handler(struct mg_rpc_request_info *ri,
 
 #define WRITE_REGS_FMT "{reg:%u,vals:%H}"
 static void cc1101_write_regs_handler(struct mg_rpc_request_info *ri,
-                                     void *cb_arg, struct mg_rpc_frame_info *fi,
-                                     struct mg_str args) {
+                                      void *cb_arg,
+                                      struct mg_rpc_frame_info *fi,
+                                      struct mg_str args) {
   unsigned reg;
   uint8_t *vals = NULL;
   int valsLen = 0;
